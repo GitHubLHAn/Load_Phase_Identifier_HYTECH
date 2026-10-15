@@ -89,7 +89,7 @@
 #define pC_H   13333
 
 #define BATTERY_LOW   9.6
-#define BATTERY_FULL  12.0
+#define BATTERY_FULL  12.5
 #define V_CHARGER_ON 0.2
 #define V_CHARGER_OFF 0.2
 
@@ -1303,6 +1303,8 @@ void Battery_Handle(Battery_Data_t *pBat)
 
 void Sleep_MCU_Handle(void)
 {
+	if(slave_status == ON_CHARGE) return;
+		
   if ((HAL_GetTick() - last_phase_active) < NO_GRID_STANDBY_TIMEOUT_MS)
   {
     return;
