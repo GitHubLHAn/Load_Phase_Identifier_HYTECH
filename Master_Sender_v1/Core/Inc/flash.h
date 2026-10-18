@@ -26,10 +26,10 @@
 	typedef struct{
 		uint16_t pw;
 		uint16_t id;
-        uint16_t zero_pA;
-        uint16_t zero_pB;
-        uint16_t zero_pC;
-        uint16_t zero_pS;
+		uint16_t zero_pA;
+		uint16_t zero_pB;
+		uint16_t zero_pC;
+		uint16_t zero_pS;
 	}info_t;
 	#pragma pack()
 

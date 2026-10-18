@@ -59,12 +59,9 @@
 
 #define MA_SIZE_PHASE_ZC 5
 
-//#define ZERO_PA 1984
-//#define ZERO_PB 1984
-//#define ZERO_PC 1978
-
 #define CYCLE_GRID 20000
 
+#define GRID_THRESHOLD 1000
 #define RANGE_GRID_L 19000        // 5%
 #define RANGE_GRID_H 21000
 
@@ -280,7 +277,7 @@ static inline void Process_Phase_ZC(Phase_Data_t *phase, uint32_t now_time)
     switch(phase->mode_det)
     {
       case WAIT_NEG:
-        if (phase->p_cur < phase->zero_val - 100)
+        if (phase->p_cur < phase->zero_val - GRID_THRESHOLD)
         {
           if(phase->phase_detected == true){
             phase->mode_det = WAIT_ZC_UP;
@@ -290,7 +287,7 @@ static inline void Process_Phase_ZC(Phase_Data_t *phase, uint32_t now_time)
         }
         break;
       case WAIT_POS:
-        if (phase->p_cur > phase->zero_val + 100)
+        if (phase->p_cur > phase->zero_val + GRID_THRESHOLD)
         {
           if(++phase->cnt_detect == TIME_DET_PHASE){
             phase->phase_detected = true;
@@ -1100,7 +1097,7 @@ void Handle_LoRa_TX(void)
   HAL_GPIO_WritePin(GEN_TRIGGER_GPIO_Port, GEN_TRIGGER_Pin, GPIO_PIN_RESET);
 
 	if(send_ok == 1){
-		HAL_GPIO_TogglePin(LED_DEBUG_ON_BOARD_GPIO_Port, LED_DEBUG_ON_BOARD_Pin);
+		//HAL_GPIO_TogglePin(LED_DEBUG_ON_BOARD_GPIO_Port, LED_DEBUG_ON_BOARD_Pin);
 		cnt_sendOK++;
 		mode_led = MODE_SET_FLASH_1;
 		//mode_buzzer = BUZZER_SET_TRIGGER_PIP;

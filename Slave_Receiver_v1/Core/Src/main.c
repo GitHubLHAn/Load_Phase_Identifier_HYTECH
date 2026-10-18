@@ -72,23 +72,16 @@
 
 #define CYCLE_GRID 20000
 
+#define GRID_THRESHOLD 1000
 #define RANGE_GRID_L 19000
 #define RANGE_GRID_H 21000
 
-#define TIME_DET_PHASE 50   //      50*20ms = 1s
+#define TIME_DET_PHASE 50   //      50*20ms = 1s, after 1s, phase detected is accepted
 #define LOSS_GRID_TIMEOUT 1000   //   100ms/0.1ms = 1000
-
-#define pA_L   0
-#define pA_H   6667
-
-#define pB_L   13333
-#define pB_H   20000
-
-#define pC_L   6667
-#define pC_H   13333
+#define NO_GRID_STANDBY_TIMEOUT_MS (30UL * 60UL * 1000UL)
 
 #define BATTERY_LOW   9.6
-#define BATTERY_FULL  12.0
+#define BATTERY_FULL  12.2
 #define V_CHARGER_ON 0.2
 #define V_CHARGER_OFF 0.2
 
@@ -194,6 +187,7 @@ DMA_HandleTypeDef hdma_usart1_tx;
 uint32_t tick_slave = 0;
 uint32_t cnt_timetick = 0;
 uint32_t cycle_timetick = 20000;
+volatile uint32_t last_phase_active = 0;
 
 volatile uint32_t ovf_tim3 = 0;
 volatile uint8_t flag_cnt_50us = 0;
@@ -269,6 +263,7 @@ void Handle_LED(void);
 void Handle_Buzzer(void);
 void Battery_Handle(Battery_Data_t *pBat);
 void Handle_LoRa_RX(void);
+void Sleep_MCU_Handle(void);
 void OFF_LED_STATUS(void);
 void ON_LED_STATUS_G(void);
 void ON_LED_STATUS_R(void);
@@ -319,7 +314,7 @@ static inline void Process_Phase_ZC(Phase_Data_t *phase, uint32_t now_time)
     switch(phase->mode_det)
     {
       case WAIT_NEG:
-        if (phase->p_cur < phase->zero_val - 100)
+        if (phase->p_cur < phase->zero_val - GRID_THRESHOLD)
         {
           if(phase->phase_detected == true){
             phase->mode_det = WAIT_ZC_UP;
@@ -329,7 +324,7 @@ static inline void Process_Phase_ZC(Phase_Data_t *phase, uint32_t now_time)
         }
         break;
       case WAIT_POS:
-        if (phase->p_cur > phase->zero_val + 100)
+        if (phase->p_cur > phase->zero_val + GRID_THRESHOLD)
         {
           if(++phase->cnt_detect == TIME_DET_PHASE){
             phase->phase_detected = true;
@@ -393,6 +388,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
       flag_cnt_50us = 0;
 
       Process_Phase_ZC(&phaseS, now_time);
+
+      if(phaseS.has_new_edge) {
+        last_phase_active = HAL_GetTick();  // Update the last phase activity tick
+        phaseS.has_new_edge = false;  
+      }
     }
   }
 
@@ -513,7 +513,6 @@ int main(void)
 
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adc_raw, 2);
 
-
 	BUZZER_ON(); HAL_Delay(15);
 	BUZZER_OFF(); HAL_Delay(100);
   OFF_LED_PA();
@@ -543,7 +542,8 @@ int main(void)
     battery.vBat_filtered = ((float)battery.adc_filterd / 4095.0f) * 3.3f * 4.9f;     // tinh dien ap theo "pBat->adc_filterd"
 		battery.vBat_last = battery.vBat_filtered;
 	}
-	
+	last_phase_active = HAL_GetTick();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -575,9 +575,12 @@ int main(void)
 
     // Battery Voltage Meas
     Battery_Handle(&battery);
-		
+
 		// Get offset for ADC measurement
     Get_Offset();
+
+    // Enter Standby after 10 minutes without a valid grid phase.
+    Sleep_MCU_Handle();
 
 #ifdef DEBUG
     // For debug
@@ -1102,7 +1105,7 @@ void Handle_LED(void)
       mode_led = MODE_FLASH_G;
       break;
     case MODE_FLASH_G:
-      if(cnt_handle_led >= 3600){			// 30ms
+      if(cnt_handle_led >= 3600){			// 180ms
         cnt_handle_led = 0;
         mode_led = MODE_OFF;      
       }
@@ -1113,7 +1116,7 @@ void Handle_LED(void)
       mode_led = MODE_FLASH_R;
       break;
     case MODE_FLASH_R:
-      if(cnt_handle_led >= 3600){			// 30ms
+      if(cnt_handle_led >= 3600){			// 180ms
         cnt_handle_led = 0;
         mode_led = MODE_OFF;      
       }
@@ -1290,6 +1293,47 @@ void Battery_Handle(Battery_Data_t *pBat)
   pBat->vBat_last = pBat->vBat_filtered;
 }
 
+void Sleep_MCU_Handle(void)
+{
+	if(slave_status == ON_CHARGE){
+		last_phase_active = HAL_GetTick();
+		return;
+	}
+		
+  if ((HAL_GetTick() - last_phase_active) < NO_GRID_STANDBY_TIMEOUT_MS)
+  {
+    return;
+  }
+
+  BUZZER_ON();
+  HAL_Delay(3000);
+
+  LoRa_gotoMode(&vLoRa, SLEEP_MODE);
+
+  /* Stop conversions and all periodic activity before entering Standby. */
+  HAL_ADC_Stop_DMA(&hadc1);
+  HAL_TIM_Base_Stop_IT(&htim1);
+  HAL_TIM_Base_Stop_IT(&htim3);
+
+  /* Put outputs in their inactive state and disable their interrupts. */
+  OFF_LED_DEBUG();
+  OFF_LED_STATUS();
+  OFF_LED_PA();OFF_LED_PB();OFF_LED_PC();
+  BUZZER_OFF();
+
+  /* Disable the wake-up source: the unit must only restart after a user
+     reset. */
+  HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
+
+  HAL_SuspendTick();
+  __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+  HAL_PWR_EnterSTANDBYMode();
+
+  /* HAL_PWR_EnterSTANDBYMode() does not return. */
+  while (1)
+  {
+  }
+}
 
 void MA_Init(MA_Filter_t *f, uint16_t init_value, uint16_t sizeMA)
 {
