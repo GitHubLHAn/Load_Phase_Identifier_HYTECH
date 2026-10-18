@@ -72,24 +72,16 @@
 
 #define CYCLE_GRID 20000
 
+#define GRID_THRESHOLD 1000
 #define RANGE_GRID_L 19000
 #define RANGE_GRID_H 21000
 
 #define TIME_DET_PHASE 50   //      50*20ms = 1s, after 1s, phase detected is accepted
 #define LOSS_GRID_TIMEOUT 1000   //   100ms/0.1ms = 1000
-#define NO_GRID_STANDBY_TIMEOUT_MS (10UL * 60UL * 1000UL)
-
-#define pA_L   0
-#define pA_H   6667
-
-#define pB_L   13333
-#define pB_H   20000
-
-#define pC_L   6667
-#define pC_H   13333
+#define NO_GRID_STANDBY_TIMEOUT_MS (30UL * 60UL * 1000UL)
 
 #define BATTERY_LOW   9.6
-#define BATTERY_FULL  12.5
+#define BATTERY_FULL  12.2
 #define V_CHARGER_ON 0.2
 #define V_CHARGER_OFF 0.2
 
@@ -322,7 +314,7 @@ static inline void Process_Phase_ZC(Phase_Data_t *phase, uint32_t now_time)
     switch(phase->mode_det)
     {
       case WAIT_NEG:
-        if (phase->p_cur < phase->zero_val - 100)
+        if (phase->p_cur < phase->zero_val - GRID_THRESHOLD)
         {
           if(phase->phase_detected == true){
             phase->mode_det = WAIT_ZC_UP;
@@ -332,7 +324,7 @@ static inline void Process_Phase_ZC(Phase_Data_t *phase, uint32_t now_time)
         }
         break;
       case WAIT_POS:
-        if (phase->p_cur > phase->zero_val + 100)
+        if (phase->p_cur > phase->zero_val + GRID_THRESHOLD)
         {
           if(++phase->cnt_detect == TIME_DET_PHASE){
             phase->phase_detected = true;
@@ -1303,20 +1295,19 @@ void Battery_Handle(Battery_Data_t *pBat)
 
 void Sleep_MCU_Handle(void)
 {
-	if(slave_status == ON_CHARGE) return;
+	if(slave_status == ON_CHARGE){
+		last_phase_active = HAL_GetTick();
+		return;
+	}
 		
   if ((HAL_GetTick() - last_phase_active) < NO_GRID_STANDBY_TIMEOUT_MS)
   {
     return;
   }
 
-  /* Warn the user with one continuous 3-second beep before power-down. */
   BUZZER_ON();
   HAL_Delay(3000);
-  BUZZER_OFF();
 
-  /* Stop the RF chip before removing SPI power/clock.  SX127x SLEEP mode
-     keeps its configuration but reduces its current to the minimum. */
   LoRa_gotoMode(&vLoRa, SLEEP_MODE);
 
   /* Stop conversions and all periodic activity before entering Standby. */
@@ -1327,9 +1318,7 @@ void Sleep_MCU_Handle(void)
   /* Put outputs in their inactive state and disable their interrupts. */
   OFF_LED_DEBUG();
   OFF_LED_STATUS();
-  OFF_LED_PA();
-  OFF_LED_PB();
-  OFF_LED_PC();
+  OFF_LED_PA();OFF_LED_PB();OFF_LED_PC();
   BUZZER_OFF();
 
   /* Disable the wake-up source: the unit must only restart after a user
