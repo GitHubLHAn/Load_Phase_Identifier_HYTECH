@@ -67,7 +67,7 @@
 
 #define TIME_DET_PHASE 100   // 2s
 #define LOSS_GRID_TIMEOUT 2500   //   100ms/0.1ms = 1000
-#define TIME_SEND_CYCLE   2000000   // 2s
+#define TIME_SEND_CYCLE   1500000   // 2s
 
 
 typedef struct
