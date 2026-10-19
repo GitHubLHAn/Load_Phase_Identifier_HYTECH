@@ -184,6 +184,9 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
+uint8_t flag_setID = 0;
+uint16_t newIDset = 0;
+
 uint32_t tick_slave = 0;
 uint32_t cnt_timetick = 0;
 uint32_t cycle_timetick = 20000;
@@ -257,7 +260,7 @@ static void MX_SPI1_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-
+void Set_ID(void);
 void Get_Offset(void);
 void Handle_LED(void);
 void Handle_Buzzer(void);
@@ -578,6 +581,9 @@ int main(void)
 
 		// Get offset for ADC measurement
     Get_Offset();
+		
+		// Set ID
+		Set_ID();
 
     // Enter Standby after 10 minutes without a valid grid phase.
     Sleep_MCU_Handle();
@@ -1058,6 +1064,24 @@ void Get_Offset(void)
   }
 }
 
+void Set_ID(void)
+{  
+  if(flag_setID == 0) return;
+	flag_setID = 0;
+  
+  vInfor_cache.id = newIDset;
+  if(Update_NEW_Infor() == UPDATE_SUCCESS){
+    mode_buzzer = BUZZER_ON;
+  }else{
+    while(1){
+      ON_LED_PA();ON_LED_PB();ON_LED_PC();BUZZER_ON();
+      HAL_Delay(100);
+      OFF_LED_PA();OFF_LED_PB();OFF_LED_PC();BUZZER_OFF();
+      HAL_Delay(100);
+    }
+  }
+}
+
 void OFF_LED_STATUS(void)
 {
   HAL_GPIO_WritePin(LED_STATUS_SLAVE_1_GPIO_Port, LED_STATUS_SLAVE_1_Pin, GPIO_PIN_RESET);
@@ -1162,8 +1186,9 @@ void Handle_LoRa_RX(void)
 	rec_ok = LoRa_receive(&vLoRa, RX_LoRa_buff, 5);
 
 	uint8_t checksum = RX_LoRa_buff[0] + RX_LoRa_buff[1] + RX_LoRa_buff[2] + RX_LoRa_buff[3];
+	uint8_t check_id = (RX_LoRa_buff[0] << 8) | RX_LoRa_buff[1];
 
-	if(RX_LoRa_buff[0] == 0xAA && checksum == RX_LoRa_buff[4])
+	if(check_id == vInfor_cache.id && checksum == RX_LoRa_buff[4])
 	{
 			mode_led = MODE_SET_FLASH_G;
 			rx_time = GetTimeUs();

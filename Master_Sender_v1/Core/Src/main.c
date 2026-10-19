@@ -67,7 +67,7 @@
 
 #define TIME_DET_PHASE 100   // 2s
 #define LOSS_GRID_TIMEOUT 2500   //   100ms/0.1ms = 1000
-#define TIME_SEND_CYCLE   2000000   // 2s
+#define TIME_SEND_CYCLE   1500000   // 2s
 
 
 typedef struct
@@ -144,6 +144,9 @@ UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
+
+uint8_t flag_setID = 0;
+uint16_t newIDset = 0;
 
 // Count variables and flags
 uint32_t tick_master = 0;
@@ -223,6 +226,7 @@ static void MX_TIM2_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void Set_ID(void);
 void Get_Offset(void);
 void Handle_LED(void);
 void Handle_Buzzer(void);
@@ -459,7 +463,7 @@ int main(void)
 		OFF_LED_DEBUG();
 		HAL_Delay(15);
 	}
-  LoRa_startReceiving(&vLoRa);
+  //LoRa_startReceiving(&vLoRa);
   // Config Lora ok
   OFF_LED_DEBUG();
   OFF_LED_STATUS();
@@ -523,6 +527,9 @@ int main(void)
 
     // Get offset for ADC measurement
     Get_Offset();
+		
+		// Set ID
+		Set_ID();
 		
   }
   /* USER CODE END 3 */
@@ -949,8 +956,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-
 void Get_Offset(void)
 {  
   if(flag_get_zero == 0) return;
@@ -975,6 +980,24 @@ void Get_Offset(void)
   vInfor_cache.zero_pA = offset_pA;
   vInfor_cache.zero_pB = offset_pB;
   vInfor_cache.zero_pC = offset_pC;
+  if(Update_NEW_Infor() == UPDATE_SUCCESS){
+    mode_buzzer = BUZZER_ON;
+  }else{
+    while(1){
+      ON_LED_PA();ON_LED_PB();ON_LED_PC();BUZZER_ON();
+      HAL_Delay(100);
+      OFF_LED_PA();OFF_LED_PB();OFF_LED_PC();BUZZER_OFF();
+      HAL_Delay(100);
+    }
+  }
+}
+
+void Set_ID(void)
+{  
+  if(flag_setID == 0) return;
+	flag_setID = 0;
+  
+  vInfor_cache.id = newIDset;
   if(Update_NEW_Infor() == UPDATE_SUCCESS){
     mode_buzzer = BUZZER_ON;
   }else{
@@ -1086,8 +1109,8 @@ void Handle_LoRa_TX(void)
 	if(!flag_send_lora) return;
 	flag_send_lora = false;
 
-	TX_Lora_buff[0] = 0xAA;
-	TX_Lora_buff[1] = 0;
+	TX_Lora_buff[0] = (vInfor_cache.id >> 8) & 0xFF;
+	TX_Lora_buff[1] = (vInfor_cache.id) & 0xFF;
 	TX_Lora_buff[2] = (delta_pAB%CYCLE_GRID)/100;
 	TX_Lora_buff[3] = (delta_pAC%CYCLE_GRID)/100;
 	TX_Lora_buff[4] = TX_Lora_buff[0] + TX_Lora_buff[1] + TX_Lora_buff[2] + TX_Lora_buff[3];
