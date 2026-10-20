@@ -61,7 +61,7 @@
 
 #define CYCLE_GRID 20000
 
-#define GRID_THRESHOLD 1000
+#define GRID_THRESHOLD 300
 #define RANGE_GRID_L 19000        // 5%
 #define RANGE_GRID_H 21000
 
