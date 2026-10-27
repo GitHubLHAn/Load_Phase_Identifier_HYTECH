@@ -491,13 +491,13 @@ int main(void)
   ON_LED_PB();
   ON_LED_PC();
 
-	Lora_Init(&vLoRa, &hspi1, 912);
+	Lora_Init(&vLoRa, &hspi1, 922);
 	LoRa_reset(&vLoRa);
 	config_lora = LoRa_Config(&vLoRa);
 	
 	while(config_lora!=0x00C8){
 		ON_LED_DEBUG(); 
-    Lora_Init(&vLoRa, &hspi1, 912);
+    Lora_Init(&vLoRa, &hspi1, 922);
 	  LoRa_reset(&vLoRa);
     config_lora = LoRa_Config(&vLoRa);
 		OFF_LED_DEBUG();

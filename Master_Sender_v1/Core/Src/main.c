@@ -204,8 +204,6 @@ char uart_tx_log[100];
 // temp variables
 
 
-
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -451,13 +449,13 @@ int main(void)
   ON_LED_PB();
   ON_LED_PC();
 
-	Lora_Init(&vLoRa, &hspi1, 912);
+	Lora_Init(&vLoRa, &hspi1, 922);
 	LoRa_reset(&vLoRa);
 	config_lora = LoRa_Config(&vLoRa);
 	
 	while(config_lora!=0x00C8){
 		ON_LED_DEBUG(); 
-    Lora_Init(&vLoRa, &hspi1, 912);
+    Lora_Init(&vLoRa, &hspi1, 922);
 	  LoRa_reset(&vLoRa);
     config_lora = LoRa_Config(&vLoRa);
 		OFF_LED_DEBUG();
@@ -476,14 +474,14 @@ int main(void)
 
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)&adc_raw, 3);
 
-  BUZZER_ON(); HAL_Delay(30);
-	BUZZER_OFF(); HAL_Delay(100);
+  BUZZER_ON(); HAL_Delay(60);
+	BUZZER_OFF(); HAL_Delay(200);
   OFF_LED_PA();
-	BUZZER_ON(); HAL_Delay(30);
-	BUZZER_OFF(); HAL_Delay(100);
+	BUZZER_ON(); HAL_Delay(60);
+	BUZZER_OFF(); HAL_Delay(200);
   OFF_LED_PB();
-	BUZZER_ON(); HAL_Delay(30);
-	BUZZER_OFF(); HAL_Delay(100);
+	BUZZER_ON(); HAL_Delay(60);
+	BUZZER_OFF(); HAL_Delay(200);
   OFF_LED_PC();
 
   HAL_TIM_Base_Start_IT(&htim1);
