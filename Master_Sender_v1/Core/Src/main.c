@@ -234,6 +234,7 @@ void ON_LED_STATUS_1(void);
 void ON_LED_STATUS_2(void);
 void MA_Init(MA_Filter_t *f, uint16_t init_value);
 uint16_t MA_Update(MA_Filter_t *f, uint16_t sample);
+void Handle_configuration(void);
 
 uint32_t GetTimeUs(){
   uint32_t ovf1, ovf2;
@@ -395,11 +396,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		/* Prevent unused argument(s) compilation warning */
 		UNUSED(GPIO_Pin);
 
-//		if(GPIO_Pin == vLoRa.DIO0_pin)
-//		{
-//			num_RX_irq_LoRa++;
-//			flag_Lora_Rx = 1;	 
-//		}	
+		if(GPIO_Pin == vLoRa.DIO0_pin)
+		{
+			num_RX_irq_LoRa++;
+			flag_Lora_Rx = true;	 
+		}	
 	}
 
 
@@ -461,7 +462,7 @@ int main(void)
 		OFF_LED_DEBUG();
 		HAL_Delay(15);
 	}
-  //LoRa_startReceiving(&vLoRa);
+  LoRa_startReceiving(&vLoRa);
   // Config Lora ok
   OFF_LED_DEBUG();
   OFF_LED_STATUS();
@@ -483,6 +484,8 @@ int main(void)
 	BUZZER_ON(); HAL_Delay(60);
 	BUZZER_OFF(); HAL_Delay(200);
   OFF_LED_PC();
+
+  Handle_configuration();
 
   HAL_TIM_Base_Start_IT(&htim1);
   HAL_TIM_Base_Start_IT(&htim3);
@@ -997,7 +1000,14 @@ void Set_ID(void)
   
   vInfor_cache.id = newIDset;
   if(Update_NEW_Infor() == UPDATE_SUCCESS){
-    mode_buzzer = BUZZER_ON;
+    HAL_Delay(1500);
+    memcpy(&TX_Lora_buff, &RX_LoRa_buff, 12);
+    TX_Lora_buff[4] = 0xFE;
+    LoRa_transmit(&vLoRa, (uint8_t*)TX_Lora_buff, 5, 10000000);
+    while(1){
+      ON_LED_PA();ON_LED_PB();ON_LED_PC();BUZZER_ON();
+      HAL_Delay(100);
+    }
   }else{
     while(1){
       ON_LED_PA();ON_LED_PB();ON_LED_PC();BUZZER_ON();
@@ -1146,6 +1156,19 @@ uint16_t MA_Update(MA_Filter_t *f, uint16_t sample)
     if(f->index >= MA_SIZE_PHASE_ZC)
         f->index = 0;
     return f->sum / MA_SIZE_PHASE_ZC;
+}
+
+void Handle_configuration(void)
+{
+  if(flag_Lora_Rx == true){
+    LoRa_receive(&vLoRa, RX_LoRa_buff, 5);
+    if(RX_LoRa_buff[0] == 0xFE && RX_LoRa_buff[1] == 0xEF && RX_LoRa_buff[4] == 0xCA){
+      newIDset = (RX_LoRa_buff[2]<<8) + RX_LoRa_buff[3];
+      flag_setID = 1;
+    }
+    flag_Lora_Rx = false;
+  }
+  LoRa_gotoMode(&vLoRa, TRANSMIT_MODE);
 }
 
 /* USER CODE END 4 */

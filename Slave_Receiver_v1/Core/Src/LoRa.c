@@ -474,37 +474,6 @@ uint8_t LoRa_transmit(LoRa* _LoRa, uint8_t* data, uint8_t length, uint32_t timeo
 		//HAL_Delay(1);
 	}
 }
-uint8_t FSK_transmit(LoRa* _LoRa, uint8_t* data, uint8_t length, uint16_t timeout){
-	uint8_t read;
-
-	int mode = _LoRa->current_mode;
-	LoRa_gotoMode(_LoRa, STNBY_MODE);
-	
-	read = LoRa_read(_LoRa, RegFiFoTxBaseAddr);
-//	LoRa_write(_LoRa, RegFiFoAddPtr, read);
-//	LoRa_write(_LoRa, RegPayloadLength, length);
-	
-	LoRa_BurstWrite(_LoRa, RegFiFo, data, length);
-	
-	//LoRa_gotoMode(_LoRa, FSTX_MODE);
-	LoRa_gotoMode(_LoRa, TRANSMIT_MODE);
-	
-	while(1){
-		read = LoRa_read(_LoRa, FSK_RegIrqFlags2);
-		if((read & 0x08)!=0){
-			LoRa_write(_LoRa, FSK_RegIrqFlags2, (read & 0xF7));
-			LoRa_gotoMode(_LoRa, mode);
-			return 1;
-		}
-		else{
-			if(--timeout==0){
-				LoRa_gotoMode(_LoRa, mode);
-				return 0;
-			}
-		}
-		//HAL_Delay(1);
-	}
-}
 
 /* ----------------------------------------------------------------------------- *\
 		name        : LoRa_startReceiving
@@ -519,13 +488,6 @@ uint8_t FSK_transmit(LoRa* _LoRa, uint8_t* data, uint8_t length, uint16_t timeou
 void LoRa_startReceiving(LoRa* _LoRa){
 	LoRa_gotoMode(_LoRa, RXCONTIN_MODE);
 }
-
-//void FSK_startReceiving(LoRa* _LoRa){
-//	LoRa_gotoMode(_LoRa, FSRX_MODE);
-//}
-//void FSK_startTrasmiting(LoRa* _LoRa){
-//	LoRa_gotoMode(_LoRa, FSTX_MODE);
-//}
 
 /* ----------------------------------------------------------------------------- *\
 		name        : LoRa_Receive
